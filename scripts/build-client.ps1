@@ -177,31 +177,7 @@ foreach ($sitePackageItem in (Get-ChildItem -LiteralPath $venvSitePackages -Forc
 Copy-Item -LiteralPath $pluginPackageInitSource -Destination (Join-Path $portablePluginsRoot '__init__.py')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination $portableRoot
 
-foreach ($pluginDirectory in (Get-ChildItem -LiteralPath $pluginSourceRoot -Directory)) {
-    $manifestPath = Join-Path $pluginDirectory.FullName 'manifest.json'
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-        continue
-    }
-    $manifest = Get-Content -LiteralPath $manifestPath -Encoding UTF8 -Raw | ConvertFrom-Json
-    if ($manifest.id -ne $pluginDirectory.Name) {
-        throw "插件标识与目录名称不一致：$manifestPath"
-    }
-    Copy-PluginFiles -SourceRoot $pluginDirectory.FullName -DestinationRoot (Join-Path $portablePluginsRoot $pluginDirectory.Name)
-}
-
-$colmonProject = Join-Path $pluginSourceRoot 'colmon\native\ColpilotColmonWindows.csproj'
-if (Test-Path -LiteralPath $colmonProject -PathType Leaf) {
-    $dotnetProgram = (Get-Command dotnet -ErrorAction Stop).Source
-    $colmonPublishRoot = Join-Path $portablePluginsRoot 'colmon\native\publish'
-    & $dotnetProgram publish $colmonProject --configuration Release --runtime win-x64 --self-contained true --disable-build-servers --nologo -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output $colmonPublishRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw "colmon 窗口宿主构建失败，退出代码为 $LASTEXITCODE"
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $colmonPublishRoot 'ColpilotColmonWindows.exe') -PathType Leaf)) {
-        throw 'colmon 发布目录缺少窗口宿主程序'
-    }
-    Get-ChildItem -LiteralPath $colmonPublishRoot -File -Filter '*.pdb' | Remove-Item -Force
-}
+# 最终发布目录只保留插件包入口，不打包任何具体插件。开发联调可另行复制插件到验证目录。
 
 $portablePythonCacheDirectories = @(
     Get-ChildItem -LiteralPath $portableRuntimeRoot -Directory -Recurse -Force -Filter '__pycache__' |
