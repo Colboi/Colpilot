@@ -1,5 +1,6 @@
 use std::ffi::c_void;
 use std::mem::size_of;
+use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
 use std::os::windows::io::AsRawHandle;
 use std::path::{Path, PathBuf};
@@ -132,18 +133,18 @@ fn tray_icon() -> tauri::image::Image<'static> {
 
 fn show_main_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
-        eprintln!("Main window was not found");
+        log::error!("Main window was not found");
         return;
     };
 
     if let Err(error) = window.show() {
-        eprintln!("Main window show failed: {error}");
+        log::error!("Main window show failed: {error}");
     }
     if let Err(error) = window.unminimize() {
-        eprintln!("Main window restore failed: {error}");
+        log::error!("Main window restore failed: {error}");
     }
     if let Err(error) = window.set_focus() {
-        eprintln!("Main window focus failed: {error}");
+        log::error!("Main window focus failed: {error}");
     }
 }
 
@@ -211,8 +212,8 @@ fn start_backend(app: &AppHandle) -> Result<BackendProcess, Box<dyn std::error::
         .arg(config_path)
         .current_dir(working_root)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .creation_flags(CREATE_NO_WINDOW);
 
@@ -226,6 +227,25 @@ fn start_backend(app: &AppHandle) -> Result<BackendProcess, Box<dyn std::error::
     }
 
     let mut child = command.spawn()?;
+    log::info!("Backend started pid={}", child.id());
+    let stdout = child.stdout.take().ok_or("Backend stdout is unavailable")?;
+    let stderr = child.stderr.take().ok_or("Backend stderr is unavailable")?;
+    std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines() {
+            match line {
+                Ok(line) => log::info!(target: "backend.stdout", "{line}"),
+                Err(error) => { log::error!("Backend stdout read failed: {error}"); break; }
+            }
+        }
+    });
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines() {
+            match line {
+                Ok(line) => log::warn!(target: "backend.stderr", "{line}"),
+                Err(error) => { log::error!("Backend stderr read failed: {error}"); break; }
+            }
+        }
+    });
     let job = match JobObject::attach(&child) {
         Ok(job) => job,
         Err(error) => {
@@ -249,7 +269,7 @@ fn request_backend_exit(port: u16) {
         .send();
 
     if let Err(error) = result {
-        eprintln!("Backend exit command failed: {error}");
+        log::error!("Backend exit command failed: {error}");
     }
 }
 
@@ -267,7 +287,7 @@ fn stop_backend(state: &BackendState) {
                     std::thread::sleep(Duration::from_millis(50));
                 }
                 Ok(None) => {
-                    eprintln!("Backend graceful shutdown timed out");
+                    log::error!("Backend graceful shutdown timed out");
                     if let Err(error) = process.child.kill() {
                         eprintln!("Backend process termination failed: {error}");
                     }
@@ -296,13 +316,13 @@ fn monitor_backend(app: AppHandle) {
             match child_slot.as_mut() {
                 Some(process) => match process.child.try_wait() {
                     Ok(Some(status)) => {
-                        eprintln!("Backend process exited with status: {status}");
+                        log::info!("Backend process exited with status: {status}");
                         child_slot.take();
                         true
                     }
                     Ok(None) => false,
                     Err(error) => {
-                        eprintln!("Backend process status check failed: {error}");
+                        log::error!("Backend process status check failed: {error}");
                         child_slot.take();
                         true
                     }
@@ -321,6 +341,7 @@ fn monitor_backend(app: AppHandle) {
 }
 
 fn shutdown_app(app: &AppHandle) {
+    log::info!("Application shutdown requested");
     let state = app.state::<BackendState>();
     if state.shutdown_requested.swap(true, Ordering::AcqRel) {
         return;
@@ -341,9 +362,30 @@ fn exit_app(app: AppHandle) {
 }
 
 pub fn run() {
+    let root = if cfg!(debug_assertions) {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().expect("Project root is unavailable").to_path_buf()
+    } else {
+        std::env::current_exe().expect("Executable path is unavailable").parent().expect("Executable directory is unavailable").to_path_buf()
+    };
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new()
+            .clear_targets()
+            .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
+                path: root.join("data").join("logs"),
+                file_name: Some("desktop".to_string()),
+            }))
+            .level(log::LevelFilter::Info)
+            .max_file_size(5 * 1024 * 1024)
+            .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
+            .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
+            .build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            std::panic::set_hook(Box::new(|information| {
+                log::error!("Rust panic: {information}");
+                log::logger().flush();
+            }));
+            log::info!("Colpilot starting pid={}", std::process::id());
             let backend = start_backend(app.handle())?;
             app.manage(BackendState {
                 child: Mutex::new(Some(backend)),
@@ -387,7 +429,7 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 if let Err(error) = window.hide() {
-                    eprintln!("Main window hide failed: {error}");
+                    log::error!("Main window hide failed: {error}");
                 }
             }
         })

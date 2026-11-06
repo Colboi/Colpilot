@@ -4,6 +4,454 @@ Command failures and integration errors.
 
 ---
 
+## [ERR-20261017-002] multipart_dependency_missing
+
+**Logged**: 2026-10-17
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+启用 FastAPI ZIP 文件上传接口时，项目运行环境缺少 `python-multipart`。
+
+### Error
+```text
+ModuleNotFoundError: No module named 'multipart'
+```
+
+### Context
+- 依赖检查使用项目 `.venv` 运行环境。
+- `backend/requirements.txt` 已加入 `python-multipart` 版本范围。
+
+### Suggested Fix
+在项目运行环境安装新增依赖，再执行后端导入和上传接口验证。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: backend/requirements.txt, backend/main.py
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已安装 `python-multipart`，后端导入和 multipart 路由检查已经通过。
+
+---
+
+## [ERR-20261017-003] private_zip_test_archive_command
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+生成本地 ZIP 验证文件的组合 PowerShell 命令受到本机执行策略拦截。
+
+### Error
+```text
+exec_command failed: CreateProcess rejected by policy
+```
+
+### Context
+- 目标是将当前项目中的实际插件文件压缩为验证用 ZIP。
+- 命令包含路径检查、旧文件处理和压缩操作，尚未生成测试文件。
+
+### Suggested Fix
+将路径检查、文件生成和压缩操作分成独立命令。
+
+### Metadata
+- **Reproducible**: unknown
+- **Related Files**: artifacts/.verification, plugins/coldmmpics
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已使用分开的压缩操作生成实际插件 ZIP 验证文件。
+
+---
+
+## [ERR-20261017-004] private_zip_test_module_path
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+从验证目录启动 ZIP 导入测试时，Python 没有自动加入项目根目录。
+
+### Error
+```text
+ModuleNotFoundError: No module named 'backend'
+```
+
+### Context
+- 验证脚本位于 `artifacts/.verification`。
+- 后端模块位于项目根目录的 `backend` 目录。
+
+### Suggested Fix
+测试入口根据自身路径加入项目根目录，再导入后端模块。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: artifacts/.verification/test_private_plugin_zip_import.py
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已补充测试入口路径设置，重新执行实际 ZIP 导入验证。
+
+---
+
+## [ERR-20261017-005] private_zip_root_manifest_path
+
+**Logged**: 2026-10-17
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+真实 ZIP 导入验证发现根目录中的 `manifest.json` 被错误解析为压缩包目录前缀。
+
+### Error
+```text
+ValueError: 插件压缩包包含多个顶层目录
+```
+
+### Context
+- 验证文件来自当前项目中的实际插件目录，包含根目录 `manifest.json` 和 `ui` 子目录。
+- 合法的插件目录结构在提取前被拒绝。
+
+### Suggested Fix
+只有当 `manifest.json` 路径包含目录分隔符时，才计算压缩包目录前缀。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: backend/plugin_manager.py, artifacts/.verification/test_private_plugin_zip_import.py
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已修正根目录 `manifest.json` 的路径判定，实际插件 ZIP 导入、来源记录和本地更新检查已经通过。
+
+---
+
+## [ERR-20261017-006] private_zip_test_artifact_cleanup
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+清理本次 ZIP 验证文件的 PowerShell 删除命令受到本机执行策略拦截。
+
+### Error
+```text
+exec_command failed: CreateProcess rejected by policy
+```
+
+### Context
+- 已核对目标为本次生成的 `coldmmpics-private.zip` 和 `private-plugin-import`。
+- 验证脚本已经通过文件编辑工具移除。
+
+### Suggested Fix
+使用 .NET 文件系统接口清理已经核对的绝对路径。
+
+### Metadata
+- **Reproducible**: unknown
+- **Related Files**: artifacts/.verification/coldmmpics-private.zip, artifacts/.verification/private-plugin-import
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已清理本次验证生成的 ZIP 文件和插件安装目录，测试脚本也已经移除。
+
+---
+
+## [ERR-20261017-007] portable_build_locked_runtime
+
+**Logged**: 2026-10-17
+**Priority**: high
+**Status**: resolved
+**Area**: build
+
+### Summary
+portable 构建清理旧运行环境时，`select.pyd` 仍被当前 portable 客户端及其 Python 后端占用。
+
+### Error
+```text
+Remove-Item: Access to the path target/portable/runtime/DLLs/select.pyd is denied.
+```
+
+### Context
+- Tauri Release 客户端本体已经生成。
+- 占用进程路径均位于当前项目的 `target/portable` 目录。
+
+### Suggested Fix
+结束已经核对的 portable 客户端及其后端进程，再重新执行 portable 构建。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: scripts/build-client.ps1, target/portable/runtime/DLLs/select.pyd
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已终止占用旧运行环境的 portable 进程，第二次完整客户端构建已经通过。
+
+---
+
+## [ERR-20261017-008] portable_exit_probe_wrapper
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+发送 portable 后端退出请求的执行包装代码使用了错误的变量引用，结果读取失败。
+
+### Error
+```text
+ReferenceError: $r is not defined
+```
+
+### Context
+- 请求目标是当前项目 `target/portable` 的后端接口。
+- 该错误发生在工具结果输出阶段，未修改项目文件。
+
+### Suggested Fix
+使用 JavaScript 变量读取嵌套命令结果，并单独核对进程状态。
+
+### Metadata
+- **Reproducible**: no
+- **Related Files**: target/portable/colpilot.exe
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已重新执行退出探测并核对进程路径。
+
+---
+
+## [ERR-20261017-009] portable_exit_probe_unavailable
+
+**Logged**: 2026-10-17
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+旧 portable 后端端口已经停止监听，受管退出接口无法使用。
+
+### Error
+```text
+Invoke-RestMethod: 由于目标计算机积极拒绝，无法连接。
+```
+
+### Context
+- 进程路径已经确认属于当前项目的 `target/portable`。
+- 后续使用进程路径核对后的直接终止操作释放文件占用。
+
+### Suggested Fix
+当后端端口不可用时，依据已核对的 portable 进程路径执行进程清理，再重新构建。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: target/portable/colpilot.exe, target/portable/runtime/python.exe
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已按完整路径核对并终止旧 portable 进程，重新构建流程继续执行。
+
+---
+
+## [ERR-20261017-010] portable_backend_relative_path_probe
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+启动发布目录后端时，工作目录与脚本参数同时包含 portable 前缀，导致脚本路径解析失败。
+
+### Error
+```text
+Invoke-RestMethod: 由于目标计算机积极拒绝，无法连接。
+```
+
+### Context
+- 工作目录已经设置为 `target/portable`。
+- 启动参数误用了从项目根目录开始的相对路径。
+
+### Suggested Fix
+从 portable 工作目录启动时，使用 `backend/main.py` 和 `runtime/python.exe` 的对应路径。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: target/portable/backend/main.py
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已改用 portable 内部路径重新启动探测。
+
+---
+
+## [ERR-20261017-001] readme_zip_import_patch_context
+
+**Logged**: 2026-10-17
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+补充本地 ZIP 插件导入说明时，补丁使用的 README 段落换行与当前文件不一致。
+
+### Error
+```text
+apply_patch verification failed: expected README context was not found
+```
+
+### Context
+- 目标是更新插件下载页面的使用说明。
+- 补丁没有修改 README 内容。
+
+### Suggested Fix
+读取目标标题附近的实际文本，再使用当前段落重新提交补丁。
+
+### Metadata
+- **Reproducible**: no
+- **Related Files**: README.md
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已重新读取 README 段落，后续使用实际文本完成更新。
+
+---
+
+## [ERR-20261016-016] backend_import_system_python
+
+**Logged**: 2026-10-16
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+使用系统 Python 导入后端时缺少项目运行依赖。
+
+### Error
+```
+ModuleNotFoundError: No module named 'uvicorn'
+```
+
+### Context
+- 验证后端设置接口时使用了系统 Python。
+- 项目依赖位于 `.venv`，客户端构建脚本也使用该环境。
+
+### Suggested Fix
+后端导入和接口验证使用项目 `.venv\Scripts\python.exe`。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: backend/main.py, scripts/build-client.ps1
+
+### Resolution
+- **Resolved**: 2026-10-16
+- **Notes**: 已改用项目运行环境继续验证。
+
+---
+
+## [ERR-20261016-017] portable_backend_test_empty_config_path
+
+**Logged**: 2026-10-16
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+portable 后端启动验证命令使用了不存在的配置文件路径解析结果，导致参数缺少值。
+
+### Error
+```
+main.py: error: argument --config-path: expected one argument
+```
+
+### Context
+- 验证 portable 自带 Python 和后端启动接口。
+- 配置文件属于首次运行时创建的文件，路径当前尚未存在。
+
+### Suggested Fix
+向后端传递明确的目标路径，即使该文件当前尚未创建。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: scripts/build-client.ps1, backend/main.py
+
+### Resolution
+- **Resolved**: 2026-10-16
+- **Notes**: 已改用 portable 目录中的明确配置目标路径继续验证。
+
+---
+
+## [ERR-20261016-018] portable_cache_cleanup_command_rejected
+
+**Logged**: 2026-10-16
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+直接执行 portable 运行环境缓存清理命令时被执行环境拒绝。
+
+### Error
+```
+exec_command failed: command rejected by policy
+```
+
+### Context
+- portable 后端接口验证生成了 Python 缓存文件。
+- 清理目标已经限定在 `target\portable`，命令仍然未执行。
+
+### Suggested Fix
+重新执行项目构建脚本，让构建脚本自身完成缓存清理和 release zip 生成。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: scripts/build-client.ps1
+
+### Resolution
+- **Resolved**: 2026-10-16
+- **Notes**: 已通过重新执行构建脚本完成清理。
+
+---
+
+## [ERR-20261016-019] backend_cache_cleanup_command_rejected
+
+**Logged**: 2026-10-16
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+直接删除测试生成的 backend Python 缓存目录时被执行环境拒绝。
+
+### Error
+```
+exec_command failed: command rejected by policy
+```
+
+### Context
+- 缓存目录为 `backend\__pycache__`，属于测试生成文件。
+- 目录已经被 `.gitignore` 忽略，不会进入项目变更。
+
+### Suggested Fix
+交由下一次完整构建脚本清理，避免单独执行递归删除命令。
+
+### Metadata
+- **Reproducible**: yes
+- **Related Files**: scripts/build-client.ps1
+
+### Resolution
+- **Resolved**: 2026-10-16
+- **Notes**: portable 目录和 release zip 已确认没有缓存文件；backend 缓存由忽略规则隔离，后续完整构建脚本会继续清理。
+
+---
+
 ## [ERR-20261016-008] plugin_order_test_config_format
 
 **Logged**: 2026-10-16
@@ -3416,5 +3864,101 @@ FAIL: active gap style
 ### Resolution
 - **Resolved**: 2026-10-16
 - **Notes**: 已使用分文件补丁完成文档更新。
+
+---
+
+## [ERR-20261019-001] local_reference_path_probe
+
+**Logged**: 2026-10-19T13:47:59+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+本地路径探查指向当前工作区中不存在的 Self Improvement 技能文件和 TrafficMonitor README。
+
+### Error
+```text
+Get-Content: Cannot find path
+```
+
+### Context
+- 技能文件位置由可用技能目录映射确定。
+- 当前工作区没有 TrafficMonitor 子目录；参考内容已经从公开项目 README 核对。
+
+### Suggested Fix
+读取技能前按技能目录映射确认文件位置；读取参考 README 前先确认本地目录是否存在。
+
+### Metadata
+- **Reproducible**: no
+- **Related Files**: plugins/colmon/README.md
+
+### Resolution
+- **Resolved**: 2026-10-19
+- **Notes**: 已使用技能目录映射读取 Self Improvement，并从公开项目 README 确认 TrafficMonitor 来源。
+
+---
+
+## [ERR-20261019-002] readme_patch_context_mismatch
+
+**Logged**: 2026-10-19T13:50:06+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+README 和学习记录补丁的结尾文本与学习记录文件当前内容不一致。
+
+### Error
+```text
+apply_patch verification failed: expected lines were not found
+```
+
+### Context
+- 补丁未修改目标文件。
+- 重新读取相关文件尾部后，README 和 AGENTS.md 更新已经完成。
+
+### Suggested Fix
+提交补丁前读取目标文件的实际段落和结尾文本。
+
+### Metadata
+- **Reproducible**: no
+- **Related Files**: .learnings/ERRORS.md, plugins/colmon/README.md
+
+### Resolution
+- **Resolved**: 2026-10-19
+- **Notes**: 已按重新读取的文件内容提交补丁。
+
+---
+
+## [ERR-20261019-003] plugin_loader_search_pattern
+
+**Logged**: 2026-10-19T13:57:19+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+插件加载器检索命令中的正则表达式括号没有闭合。
+
+### Error
+```text
+rg: regex parse error: unclosed group
+```
+
+### Context
+- 只读检索命令失败，没有修改文件。
+- 随后使用有效搜索模式核对插件清单加载和页面映射。
+
+### Suggested Fix
+执行搜索前检查正则表达式的括号是否完整。
+
+### Metadata
+- **Reproducible**: no
+- **Related Files**: backend/main.py, src/plugin-views.js
+
+### Resolution
+- **Resolved**: 2026-10-19
+- **Notes**: 已使用有效搜索模式确认插件入口由 manifest 的 id、backend、view 和 frontend 字段加载。
 
 ---

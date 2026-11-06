@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,11 @@ from backend.process_manager import ManagedProcessRegistry
 from backend.plugin_manager import MAX_PLUGIN_ARCHIVE_BYTES, PluginRepositoryManager
 from backend.plugin_runtime import PluginNotReadyError, PluginRuntime, PluginWorker
 from backend.settings import read_appearance, theme_presets, update_appearance
+from backend.diagnostics import configure_logging
+
+
+configure_logging(PROJECT_ROOT / 'data' / 'logs')
+logger = logging.getLogger(__name__)
 
 
 BACKEND_PORT = 37651
@@ -251,16 +257,19 @@ def stop_plugin_handlers() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info('后端启动 plugins=%s', list(PLUGIN_WORKERS))
     try:
         get_plugin_repository_manager().start()
         for worker in PLUGIN_WORKERS.values():
             worker.start()
         yield
     finally:
+        logger.info('后端开始关闭')
         try:
             get_plugin_repository_manager().stop()
         finally:
             stop_plugin_handlers()
+            logger.info('后端关闭完成')
 
 
 app = FastAPI(
@@ -282,6 +291,24 @@ app.add_middleware(
     allow_methods=['GET', 'POST'],
     allow_headers=['Content-Type'],
 )
+
+
+@app.middleware('http')
+async def log_requests(request: Request, call_next):
+    started = time.monotonic()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception('请求处理失败 method=%s path=%s', request.method, request.url.path)
+        raise
+    elapsed = time.monotonic() - started
+    if response.status_code >= 500 or elapsed > 2:
+        logger.log(
+            logging.ERROR if response.status_code >= 500 else logging.WARNING,
+            '请求状态 method=%s path=%s status=%s elapsed_ms=%.1f',
+            request.method, request.url.path, response.status_code, elapsed * 1000,
+        )
+    return response
 
 
 def get_plugin_definition(plugin_id: str) -> dict[str, object]:
@@ -522,6 +549,7 @@ def run_plugin(plugin_id: str, request: PluginRunRequest) -> Any:
 
 @app.post('/api/commands')
 def execute_command(request: CommandRequest) -> dict[str, str | bool]:
+    logger.info('收到程序退出请求')
     server = getattr(app.state, 'server', None)
     if server is None:
         raise RuntimeError('Backend server is not ready')
@@ -546,6 +574,8 @@ def main() -> None:
             host='127.0.0.1',
             port=arguments.port,
             log_level='warning',
+            log_config=None,
+            access_log=False,
         )
     )
     app.state.server = server

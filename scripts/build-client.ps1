@@ -15,10 +15,22 @@ $backendProcessManagerSource = Join-Path $projectRoot 'backend\process_manager.p
 $backendPluginManagerSource = Join-Path $projectRoot 'backend\plugin_manager.py'
 $backendPluginRuntimeSource = Join-Path $projectRoot 'backend\plugin_runtime.py'
 $backendSettingsSource = Join-Path $projectRoot 'backend\settings.py'
+$backendDiagnosticsSource = Join-Path $projectRoot 'backend\diagnostics.py'
 $backendRequirementsSource = Join-Path $projectRoot 'backend\requirements.txt'
 $portableBackendRoot = Join-Path $portableRoot 'backend'
 $portableRuntimeRoot = Join-Path $portableRoot 'runtime'
 $portablePluginsRoot = Join-Path $portableRoot 'plugins'
+
+function Assert-ProjectPath {
+    param([string]$Path)
+    $absolutePath = [System.IO.Path]::GetFullPath($Path)
+    if (-not $absolutePath.StartsWith($projectRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "生成文件目录超出项目范围：$absolutePath"
+    }
+    if ((Get-Item -LiteralPath $absolutePath -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        throw "生成文件目录包含链接：$absolutePath"
+    }
+}
 
 function Copy-PluginFiles {
     param(
@@ -101,6 +113,7 @@ $portableSources = @(
     $backendPluginManagerSource,
     $backendPluginRuntimeSource,
     $backendSettingsSource,
+    $backendDiagnosticsSource,
     $backendRequirementsSource,
     (Join-Path $baseRuntimeRoot 'python.exe'),
     (Join-Path $baseRuntimeRoot 'pythonw.exe'),
@@ -118,7 +131,13 @@ foreach ($sourcePath in @($artifactSources + $portableSources)) {
 }
 
 if (Test-Path -LiteralPath $outputRoot) {
-    Get-ChildItem -LiteralPath $outputRoot -Force | Remove-Item -Recurse -Force
+    if ((Resolve-Path -LiteralPath $outputRoot).Path -ne (Join-Path $projectRoot 'target')) {
+        throw '构建输出目录与项目 target 目录不一致'
+    }
+    foreach ($outputItem in (Get-ChildItem -LiteralPath $outputRoot -Force)) {
+        Assert-ProjectPath $outputItem.FullName
+        Remove-Item -LiteralPath $outputItem.FullName -Recurse -Force
+    }
 } else {
     New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 }
@@ -132,6 +151,7 @@ Copy-Item -LiteralPath $backendProcessManagerSource -Destination (Join-Path $por
 Copy-Item -LiteralPath $backendPluginManagerSource -Destination (Join-Path $portableBackendRoot 'plugin_manager.py')
 Copy-Item -LiteralPath $backendPluginRuntimeSource -Destination (Join-Path $portableBackendRoot 'plugin_runtime.py')
 Copy-Item -LiteralPath $backendSettingsSource -Destination (Join-Path $portableBackendRoot 'settings.py')
+Copy-Item -LiteralPath $backendDiagnosticsSource -Destination (Join-Path $portableBackendRoot 'diagnostics.py')
 Copy-Item -LiteralPath $backendRequirementsSource -Destination (Join-Path $portableBackendRoot 'requirements.txt')
 foreach ($runtimeFile in (Get-ChildItem -LiteralPath $baseRuntimeRoot -Filter '*.dll' -File)) {
     Copy-Item -LiteralPath $runtimeFile.FullName -Destination $portableRuntimeRoot -Force
@@ -188,6 +208,7 @@ $portablePythonCacheDirectories = @(
         Sort-Object { $_.FullName.Length } -Descending
 )
 foreach ($cacheDirectory in $portablePythonCacheDirectories) {
+    Assert-ProjectPath $cacheDirectory.FullName
     Remove-Item -LiteralPath $cacheDirectory.FullName -Recurse -Force
 }
 $portablePythonCacheFiles = @(
@@ -223,8 +244,12 @@ foreach ($generatedPath in @(
 )) {
     if (Test-Path -LiteralPath $generatedPath) {
         if ($generatedPath -eq (Join-Path $projectRoot 'plugins')) {
-            Get-ChildItem -LiteralPath $generatedPath -Directory -Recurse -Filter '__pycache__' | Remove-Item -Recurse -Force
+            foreach ($cacheDirectory in (Get-ChildItem -LiteralPath $generatedPath -Directory -Recurse -Filter '__pycache__')) {
+                Assert-ProjectPath $cacheDirectory.FullName
+                Remove-Item -LiteralPath $cacheDirectory.FullName -Recurse -Force
+            }
         } else {
+            Assert-ProjectPath $generatedPath
             Remove-Item -LiteralPath $generatedPath -Recurse -Force
         }
     }

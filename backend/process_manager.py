@@ -1,9 +1,13 @@
 import os
+import logging
 import subprocess
 import threading
 import time
 from dataclasses import dataclass
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,15 +22,18 @@ class ManagedProcessRegistry:
         self._processes: dict[int, ManagedProcess] = {}
 
     def register(self, owner: str, process: subprocess.Popen[Any]) -> subprocess.Popen[Any]:
+        logger.info('登记子进程 owner=%s pid=%s', owner, process.pid)
         with self._lock:
             self._processes[id(process)] = ManagedProcess(owner, process)
         return process
 
     def unregister(self, process: subprocess.Popen[Any]) -> None:
+        logger.info('移除子进程 pid=%s exit_code=%s', process.pid, process.poll())
         with self._lock:
             self._processes.pop(id(process), None)
 
     def stop_process(self, process: subprocess.Popen[Any], timeout_seconds: float = 3.0) -> None:
+        logger.info('停止子进程 pid=%s timeout=%s', process.pid, timeout_seconds)
         self.unregister(process)
         if process.poll() is not None:
             process.wait()

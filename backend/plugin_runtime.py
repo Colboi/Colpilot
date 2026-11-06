@@ -122,6 +122,12 @@ class PluginWorker:
 
                 with self._condition:
                     if revision == self._revision:
+                        if runtime != self._runtime:
+                            logger.log(
+                                logging.ERROR if runtime.status == 'error' else logging.INFO,
+                                '插件状态 plugin=%s status=%s detail=%s',
+                                self.plugin_id, runtime.status, runtime.detail,
+                            )
                         self._runtime = runtime
                 applied_revision = revision
         finally:

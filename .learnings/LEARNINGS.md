@@ -857,3 +857,139 @@ Colpilot 程序名和设置入口需要固定放在左侧栏顶部，插件导�
 ### Resolution
 - **Resolved**: 2026-10-16
 - **Notes**: 已完成用户版 README 重写，并通过文本检查确认开发内容、具体插件名称和预装说明均已移除。
+
+---
+
+## [LRN-20261019-001] distribution_directory
+
+**Logged**: 2026-10-19
+**Priority**: high
+**Status**: resolved
+**Area**: infra
+
+### Summary
+构建输出统一为 `target/Colpilot`，用户将该目录中的内容直接覆盖到原程序目录完成更新。
+
+### Details
+发布目录包含主程序、运行环境和插件运行文件。构建时排除个人配置、运行数据、日志、缓存和开发文档；插件程序文件随主程序一起更新。
+
+### Suggested Action
+构建后使用旧程序目录的真实副本验证覆盖更新，核对配置和插件数据内容，并验证更新后的程序及窗口宿主能够启动。
+
+### Metadata
+- Source: user_feedback
+- Related Files: scripts/build-client.ps1, README.md
+- Tags: build, distribution, update
+
+---
+
+## [LRN-20261019-002] desc_authentication_verification
+
+**Logged**: 2026-10-19
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+DESC 登录验证需要核对服务端响应和当前网站提交的请求内容。
+
+### Details
+当前网站通过 `POST /api/user/validate` 提交包含 `username`、`password` 的 JSON，密码直接使用输入内容。服务端拒绝登录信息时返回 HTTP 401，响应类型为 `text/plain`，内容为 `Authentication failed`。验证记录只保留状态和响应说明，不保存账号、密码和 token。
+
+真实账号验证包含登录、用户信息、容器列表及剩余时间读取，全部请求返回 HTTP 200。安装目录中的账号设置通过程序设置接口保存，并检查保存内容与授权测试信息是否一致；验证输出仅记录比较结果。运行状态应为 `running`、认证状态应为成功、同步错误应为空，自动续约保持关闭。
+
+### Suggested Action
+登录诊断使用用户授权的真实账号，比较请求地址、字段和服务端响应。只有登录成功后才验证用户信息与容器读取，自动续约保持关闭。
+
+### Metadata
+- Source: verified_diagnostic
+- Related Files: plugins/coldesc/backend.py
+- Tags: desc, authentication, credentials
+
+---
+
+## [LRN-20261019-003] desc_refresh_and_account_controls
+
+**Logged**: 2026-10-19
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+账号表单通过保存按钮提交；DESC 登录失败后保留修改与重试操作，资料获取与剩余时间获取分别调度。
+
+### Details
+容器资料默认每 259200 秒获取，剩余时间默认每 600 秒获取。页面依据服务端到期时间与本地经过时间，每秒显示倒计时。登录、重新登录、手动获取和续约触发相应信息更新。插件后端可用时，插件页面保持可操作。
+
+### Suggested Action
+使用真实服务检查登录拒绝与恢复、保存相同账号后的重新登录、两个间隔的独立请求次数和倒计时期间的请求次数。完整程序验证包含账号按钮、窗口控制及滚动条，原程序配置通过文件校验确认保持不变。
+
+### Metadata
+- Source: verified_diagnostic
+- Related Files: plugins/coldesc/backend.py, plugins/coldesc/ui/ColdescView.vue, plugins/colszunet/ui/ColszunetView.vue, src/App.vue, src/WindowTitleBar.vue, src/style.css
+- Tags: desc, refresh, countdown, credentials, window
+
+---
+
+## [LRN-20261024-001] best_practice
+
+**Logged**: 2026-10-24
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+任务栏插件需要独立的窗口线程响应检查、持续保存的错误日志和 Windows 故障事件记录。
+
+### Details
+Colpilot 的桌面程序、Python 后端和 WinForms 窗口宿主分别保存轮换日志。窗口宿主使用独立线程检查 UI 响应，记录当前操作及耗时。定期检查同时读取接口状态、任务栏响应、数据更新时间、新增 Windows 故障事件和检查区间内的错误日志。
+
+### Suggested Action
+程序更新前后校验用户配置与运行数据，异常归档保存在 artifacts/monitoring；完成异常分析与修复后重新设置检查起点。
+
+### Metadata
+- Source: verified_diagnostic
+- Related Files: backend/diagnostics.py, plugins/colmon/native/NativeDiagnostics.cs, scripts/check-colpilot.ps1, scripts/deploy-client.ps1
+- Tags: colmon, diagnostics, taskbar, monitoring
+
+## [LRN-20261027-001] best_practice
+
+**Logged**: 2026-10-27
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+任务栏窗口线程提交输出消息时需要独立发送线程、队列容量限制和通信超时终止。
+
+### Details
+Windows 文件句柄占用可以阻止状态文件替换。输出处理失败时必须终止宿主，保留错误原因。真实文件占用与管道停止读取测试已经验证宿主及时终止，输出阻塞期间窗口线程保持响应。
+
+### Suggested Action
+涉及窗口宿主通信的修改执行 scripts/verify-colmon-communication.py 与 scripts/verify-native-diagnostics.py。
+
+### Metadata
+- Source: verified_diagnostic
+- Related Files: plugins/colmon/native_host.py, plugins/colmon/native/Program.cs, plugins/colmon/native/NativeDiagnostics.cs, scripts/verify-colmon-communication.py
+- Tags: colmon, communication, file-sharing, responsiveness
+
+## [LRN-20261028-001] best_practice
+
+**Logged**: 2026-10-28
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+可重新生成的窗口状态文件在同一把进程内锁中完成读写，并保留原文件。
+
+### Details
+真实 Windows 读取句柄持续打开测试验证了状态更新与并发接口查询正常；禁止写入共享的句柄验证了保存失败时宿主及时终止。对应验证保存在 scripts/verify-colmon-communication.py。
+
+### Suggested Action
+更改状态文件处理时执行真实文件共享、并发状态查询和管道通信验证。
+
+### Metadata
+- Source: verified_diagnostic
+- Related Files: plugins/colmon/native_host.py, plugins/colmon/backend.py, scripts/verify-colmon-communication.py
+- Tags: colmon, state-files, windows-sharing

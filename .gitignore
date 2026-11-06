@@ -9,6 +9,7 @@ backend/*.pyc
 plugins/*
 !plugins/__init__.py
 artifacts/
+data/
 backend/build/
 backend/dist/
 *.pyc

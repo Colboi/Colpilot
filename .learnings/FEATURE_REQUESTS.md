@@ -624,3 +624,65 @@ medium
 ### Resolution
 - **Resolved**: 2026-10-16
 - **Notes**: 已完成拖拽排序、后端顺序接口、程序级配置保存、重启读取和 portable 客户端验证。
+
+---
+
+## [FEAT-20261016-004] settings_plugin_distribution_and_themes
+
+**Logged**: 2026-10-16
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Requested Capability
+增加内置设置窗口、外观主题管理、GitHub 插件下载与更新检查，并生成不包含插件文件的 portable 客户端目录和 release zip。
+
+### User Context
+用户需要在 Colpilot 内完成个人配置、主题调整和插件来源管理，同时保持客户端发布包的基础内容清晰可控。
+
+### Complexity Estimate
+complex
+
+### Suggested Implementation
+使用独立的设置界面、程序级 appearance 配置和插件来源管理模块。插件安装记录保存仓库地址与提交标识，定时检查只更新状态，不自动覆盖插件文件。构建脚本输出 plugin-free portable 目录及其 zip 文件。
+
+### Metadata
+- Frequency: first_time
+- Related Features: plugin_materials_stay_with_plugin, plugin_drag_reordering
+- Tags: settings, themes, github, plugin-manager, portable
+
+### Resolution
+- **Resolved**: 2026-10-16
+- **Notes**: 已完成内置设置窗口、外观预设和颜色配置、GitHub 插件下载与提交状态检查、可选插件图标接口，以及 plugin-free portable 文件夹和 release zip 构建输出。
+
+---
+
+## [FEAT-20261017-001] private_plugin_zip_import
+
+**Logged**: 2026-10-17T00:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Requested Capability
+在插件管理设置中导入本地 ZIP 仓库，以便安装私有插件。
+
+### User Context
+部分插件仓库无法通过公开 GitHub 地址访问，需要使用本地 ZIP 文件安装，并继续由 Colpilot 保存来源信息和管理插件生命周期。
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+复用插件清单校验、安全解压和插件来源记录流程，增加 multipart ZIP 上传接口与设置页面文件选择器。本地 ZIP 来源显示本地文件名称，定时更新检查只处理 GitHub 来源。
+
+### Metadata
+- Frequency: first_time
+- Related Features: settings_plugin_distribution_and_themes
+- Tags: settings, private-plugin, zip, plugin-manager
+
+### Resolution
+- **Resolved**: 2026-10-17
+- **Notes**: 已加入本地 ZIP 选择器、multipart 上传接口、安全解压、来源记录和本地来源状态；实际插件 ZIP 导入与发布版 portable 客户端验证已经通过。
+
+---
